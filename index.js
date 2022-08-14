@@ -43,8 +43,7 @@ const ADDRESS = '0x7121cbda61e025eb6639cd797f63aad30f270680';
 const init = async () => {
   // For Koinly import
   const transactions = await fetchTransactions(ADDRESS);
-  const sortedTransactions = transactions.sort((a, b) => a.date - b.date < 0 ? 1 : -1)
-  console.log(sortedTransactions);
+  // const sortedTransactions = transactions.sort((a, b) => a.date - b.date < 0 ? 1 : -1)
   // const salesRes = await fetchSales(ADDRESS);
 
   // const sales = salesRes.erc1155Purchases.map(sale => {
