@@ -1,5 +1,6 @@
 import {
-  utils
+  utils,
+  BigNumber
 } from 'ethers';
 import {
   timestampToDate
@@ -28,10 +29,9 @@ export const fetchTransactions = async (address) => {
   // return [...formattedBids, ...formattedPurchasedErc1155, ...formattedSoldErc1155];
 
   const erc721Purchases = await fetchERC721Purchases(address);
-  const erc721sMapped = mapERC721Types(erc721Purchases.erc721Listings);
+  const formattedERC721Purchases = await getFormattedERC721s(erc721Purchases.erc721Listings, true);
 
-  const splitPurchases = await splitERC1155FromERC721s(erc721sMapped.gotchis);
-  console.log(splitPurchases);
+  console.log(formattedERC721Purchases);
 }
 
 const formatBids = (bids) => {
@@ -53,13 +53,11 @@ const formatBids = (bids) => {
   })
 }
 
-const formatERC1155Purchases = (purchases, type) => {
-  const isPurchase = type === PURCHASE;
-
+const formatERC1155Purchases = (purchases, isPurchase) => {
   return purchases.map(purchase => {
     const nftId = `GOTCHI ERC1155 #${purchase.erc1155TypeId}`;
     const nftQuantity = Number(purchase.quantity);
-    const tokenCost = Number(utils.formatEther(purchase.priceInWei)) * nftQuantity;
+    const tokenCost = Number(purchase.priceInWei / Math.pow(10, 18)) * nftQuantity;
 
     return {
       date: timestampToDate(purchase.timeLastPurchased),
@@ -78,6 +76,20 @@ const formatERC1155Purchases = (purchases, type) => {
   })
 }
 
+const getFormattedERC721s = async (erc721s, isPurchase) => {
+  const {
+    gotchis,
+    portals,
+    realmParcels
+  } = mapERC721Types(erc721s);
+  const splitPurchases = await splitERC1155FromERC721s(gotchis);
+  const equippedERC1155s = formatERC1155Purchases(splitPurchases.erc1155s, isPurchase);
+  const formattedGotchis = formatERC721Listings(splitPurchases.gotchis, isPurchase, 'GOTCHI');
+  const formattedPortals = formatERC721Listings(portals, isPurchase, 'GOTCHI');
+  const formattedRealm = formatERC721Listings(realmParcels, isPurchase, 'REALM');
+  return [...equippedERC1155s, ...formattedGotchis, ...formattedPortals, ...formattedRealm];
+}
+
 const mapERC721Types = (erc721s) => {
   const realmParcels = erc721s.filter(item => item.parcelHash);
   const portals = erc721s.filter(item => !item.parcelHash && !item.gotchi);
@@ -90,22 +102,22 @@ const mapERC721Types = (erc721s) => {
 }
 
 const splitERC1155FromERC721s = async (erc721s) => {
-  let allEquippedPurchases = [];
-  const purchasedGotchis = [];
+  let erc1155s = [];
+  const gotchis = [];
   for (let i = 0; i < erc721s.length; i++) {
 
     const gotchi = erc721s[i];
     const equipped = await equippedERC1155(gotchi);
-    allEquippedPurchases = [...allEquippedPurchases, ...equipped];
+    erc1155s = [...erc1155s, ...equipped];
 
-    purchasedGotchis.push({
+    gotchis.push({
       ...gotchi,
       priceInWei: Number(gotchi.priceInWei) - equipped.reduce((a, b) => a + Number(b.priceInWei), 0)
     })
   }
   return {
-    equipped: allEquippedPurchases,
-    gotchis: purchasedGotchis
+    erc1155s,
+    gotchis
   }
 }
 
@@ -129,5 +141,28 @@ const fetchGoingRateForERC1155 = async (tokenId, timePurchased) => {
     erc1155Purchases
   } = await fetchWeeklyERC1155Sales(tokenId, timePurchased);
   const average = erc1155Purchases.reduce((acc, curr) => acc + Number(curr.priceInWei), 0) / erc1155Purchases.length;
-  return average;
+  return average.toString();
+}
+
+const formatERC721Listings = (listings, isPurchase, type) => {
+  return listings.map(listing => {
+    const nftId = `${type} ERC721 #${listing.tokenId}`;
+    const nftQuantity = 1;
+    const tokenCost = Number(listing.priceInWei / Math.pow(10, 18)) * nftQuantity;
+
+    return {
+      date: timestampToDate(listing.timePurchased),
+      sentAmount: isPurchase ? tokenCost : nftQuantity,
+      sentCurrency: isPurchase ? "GHST" : nftId,
+      receivedAmount: isPurchase ? nftQuantity : tokenCost,
+      receivedCurrency: isPurchase ? nftId : "GHST",
+      feeAmount: 0,
+      feeCurrency: 'MATIC',
+      netWorthAmount: undefined,
+      netWorthCurrency: undefined,
+      label: 'swap',
+      description: undefined,
+      txHash: undefined
+    }
+  })
 }
