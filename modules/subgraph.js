@@ -44,6 +44,7 @@ const erc1155Listings = (address, isBuyer) => {
   const role = isBuyer ? 'buyer' : 'seller';
   return `{
     erc1155Purchases(where: { ${role}: "${address}"}) {
+      listingID
       timeLastPurchased
       erc1155TypeId
       priceInWei

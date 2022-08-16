@@ -10,6 +10,9 @@ import {
   fetchWeeklyERC1155Sales,
   fetchERC721Sales
 } from './subgraph.js';
+import {
+  getERC1155ListingEvent
+} from './contract.js';
 
 export const fetchTransactions = async (address) => {
   const erc1155Transactions = await getERC1155Transactions(address);
@@ -26,8 +29,8 @@ const getERC1155Transactions = async (address) => {
   const soldERC1155Res = await fetchBaazaarERC1155Sales(address);
 
   const formattedBids = formatBids(bids);
-  const formattedPurchasedErc1155 = formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, true);
-  const formattedSoldErc1155 = formatERC1155Purchases(soldERC1155Res.erc1155Purchases, false);
+  const formattedPurchasedErc1155 = await formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, true);
+  const formattedSoldErc1155 = await formatERC1155Purchases(soldERC1155Res.erc1155Purchases, false);
 
   return [...formattedBids, ...formattedPurchasedErc1155, ...formattedSoldErc1155];
 }
@@ -46,7 +49,7 @@ const formatBids = (bids) => {
   })
 }
 
-const mapToExcelFormat = (timeStamp, sent, received) => {
+const mapToExcelFormat = (timeStamp, sent, received, txHash) => {
   return {
     date: timestampToDate(timeStamp),
     sentAmount: sent.amount,
@@ -59,15 +62,18 @@ const mapToExcelFormat = (timeStamp, sent, received) => {
     netWorthCurrency: undefined,
     label: 'swap',
     description: undefined,
-    txHash: undefined
+    txHash: txHash
   }
 }
 
-const formatERC1155Purchases = (purchases, isPurchase) => {
-  return purchases.map(purchase => {
+const formatERC1155Purchases = async (purchases, isPurchase) => {
+  return await Promise.all(purchases.map(async purchase => {
     const nftId = `GOTCHI ERC1155 #${purchase.erc1155TypeId}`;
     const nftQuantity = Number(purchase.quantity);
     const tokenCost = priceInWeiToEthers(purchase.priceInWei) * nftQuantity;
+
+    const event = await getERC1155ListingEvent(purchase.listingID, purchase.timeLastPurchased);
+    const txHash = event ? event.transactionHash : undefined;
 
     const sent = {
       amount: isPurchase ? tokenCost : nftQuantity,
@@ -78,8 +84,8 @@ const formatERC1155Purchases = (purchases, isPurchase) => {
       currency: isPurchase ? nftId : "GHST"
     }
 
-    return mapToExcelFormat(purchase.timeLastPurchased, sent, received)
-  })
+    return mapToExcelFormat(purchase.timeLastPurchased, sent, received, txHash)
+  }))
 }
 
 const getERC721Transactions = async (address) => {
@@ -98,7 +104,7 @@ const getFormattedERC721s = async (erc721s, isPurchase) => {
     realmParcels
   } = mapERC721Types(erc721s);
   const splitPurchases = await splitERC1155FromERC721s(gotchis);
-  const equippedERC1155s = formatERC1155Purchases(splitPurchases.erc1155s, isPurchase);
+  const equippedERC1155s = await formatERC1155Purchases(splitPurchases.erc1155s, isPurchase);
   const formattedGotchis = formatERC721Listings(splitPurchases.gotchis, isPurchase, 'GOTCHI');
   const formattedPortals = formatERC721Listings(portals, isPurchase, 'GOTCHI');
   const formattedRealm = formatERC721Listings(realmParcels, isPurchase, 'REALM');

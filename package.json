@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "export": "node --experimental-json-modules ."
+    "export": "node --experimental-json-modules .",
+    "updateBlocks": "node --experimental-json-modules ./updateBlocks.js"
   },
   "author": "",
   "license": "ISC",
