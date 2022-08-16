@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import ethers from 'ethers';
 import diamondAbi from '../abi/diamond.json';
 import {
@@ -8,10 +11,7 @@ const addresses = {
   diamond: '0x86935F11C86623deC8a25696E1C19a8659CbF95d',
 }
 
-const maticProvider = "https://rpc-mainnet.maticvigil.com/v1/6953cb25473bea6fa166c185b92af30ec74b2548"
-export const provider = new ethers.providers.JsonRpcProvider(maticProvider)
-
-
+export const provider = new ethers.providers.JsonRpcProvider(process.env.JSON_RPC_PROVIDER)
 
 export const getERC1155ListingEvent = async (listingId, timestamp) => {
   const range = findBlockRange(timestamp);
