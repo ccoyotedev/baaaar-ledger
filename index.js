@@ -1,10 +1,10 @@
 import {
   fetchTransactions,
 } from "./modules/transactions.js";
-import exportToExcel from "./modules/exportToExcel.js";
 import {
-  provider
-} from "./modules/contract.js";
+  formatDate
+} from "./modules/helpers.js";
+import exportToExcel from "./modules/exportToExcel.js";
 
 // IN GENERAL ----------
 // Fetch purchases in Baazaar + GBM auction
@@ -41,35 +41,20 @@ import {
 const ADDRESS = '0x7121cbda61e025eb6639cd797f63aad30f270680';
 
 const init = async () => {
-  // For Koinly import
   const transactions = await fetchTransactions(ADDRESS);
-  // const sortedTransactions = transactions.sort((a, b) => a.date - b.date < 0 ? 1 : -1)
-  // const salesRes = await fetchSales(ADDRESS);
+  const sortedTransactions = transactions.sort((a, b) => a.date - b.date < 0 ? 1 : -1)
+  const formattedTransactions = formatData(sortedTransactions);
 
-  // const sales = salesRes.erc1155Purchases.map(sale => {
-  //   return {
-  //     ...sale,
-  //     priceInWei: -sale.priceInWei
-  //   }
-  // })
-
-  // const purchaseAndSales = [...purchasesRes.erc1155Purchases, ...sales];
-  // const sortedByDate = purchaseAndSales.sort((a, b) => a.timeLastPurchased - b.timeLastPurchased < 0 ? 1 : -1)
-
-  // const groupedData = groupData(sortedByDate);
-
-  // console.log(groupedData);
-  // exportToExcel(groupedData);
+  exportToExcel(formattedTransactions);
 }
 
-
-
-const formatData = (subgraphResults) => {
-  return subgraphResults.map(item => {
-    return {
-      date: new Date(Number(item.timeLastPurchased) * 1000),
-      asset: `Gotchi ERC1155 (${item.erc1155TypeId})`
-    }
+const formatData = (transactions) => {
+  return transactions.map((transaction) => {
+    const copy = {
+      ...transaction
+    };
+    copy.date = formatDate(copy.date);
+    return copy;
   })
 }
 

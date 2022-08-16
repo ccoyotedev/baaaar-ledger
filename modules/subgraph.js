@@ -31,30 +31,19 @@ const callSubgraph = async (query, abi) => {
 };
 
 export const fetchBaazaarERC1155Purchases = async (address) => {
-  const purchaseQuery = erc1155Purchases(address);
+  const purchaseQuery = erc1155Listings(address, true);
   return await callSubgraph(purchaseQuery);
 }
 
-const erc1155Purchases = (address) => {
-  return `{
-    erc1155Purchases(where: { buyer: "${address}"}) {
-      timeLastPurchased
-      erc1155TypeId
-      priceInWei
-      quantity
-      listingID
-    }
-  }`
-}
-
 export const fetchBaazaarERC1155Sales = async (address) => {
-  const salesQuery = erc1155Sales(address);
+  const salesQuery = erc1155Listings(address, false);
   return await callSubgraph(salesQuery);
 }
 
-const erc1155Sales = (address) => {
+const erc1155Listings = (address, isBuyer) => {
+  const role = isBuyer ? 'buyer' : 'seller';
   return `{
-    erc1155Purchases(where: { seller: "${address}"}) {
+    erc1155Purchases(where: { ${role}: "${address}"}) {
       timeLastPurchased
       erc1155TypeId
       priceInWei
@@ -64,13 +53,19 @@ const erc1155Sales = (address) => {
 }
 
 export const fetchERC721Purchases = async (address) => {
-  const purchaseQuery = erc721Purchases(address);
+  const purchaseQuery = erc721Listings(address, true);
   return await callSubgraph(purchaseQuery);
 }
 
-const erc721Purchases = (address) => {
+export const fetchERC721Sales = async (address) => {
+  const salesQuery = erc721Listings(address, false);
+  return await callSubgraph(salesQuery);
+}
+
+const erc721Listings = (address, isBuyer) => {
+  const role = isBuyer ? 'buyer' : 'seller';
   return `{
-    erc721Listings(where: {timePurchased_gt: 0, buyer: "${address}"}) {
+    erc721Listings(where: {timePurchased_gt: 0, ${role}: "${address}"}) {
       tokenId
       priceInWei
       timePurchased

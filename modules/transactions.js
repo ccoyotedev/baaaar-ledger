@@ -1,79 +1,94 @@
 import {
-  utils,
-  BigNumber
-} from 'ethers';
-import {
-  timestampToDate
+  timestampToDate,
+  priceInWeiToEthers
 } from './helpers.js';
 import {
   fetchGBMPurchases,
   fetchBaazaarERC1155Purchases,
   fetchBaazaarERC1155Sales,
   fetchERC721Purchases,
-  fetchWeeklyERC1155Sales
+  fetchWeeklyERC1155Sales,
+  fetchERC721Sales
 } from './subgraph.js';
 
-
-const PURCHASE = 'PURCHASE';
-const SALE = 'SALE';
-
 export const fetchTransactions = async (address) => {
+  const erc1155Transactions = await getERC1155Transactions(address);
+  const erc721Transactions = await getERC721Transactions(address);
+
+  return [...erc1155Transactions, ...erc721Transactions];
+}
+
+const getERC1155Transactions = async (address) => {
   const {
     bids
   } = await fetchGBMPurchases(address);
-  // const formattedBids = formatBids(bids);
-  // const purchaseERC1155Res = await fetchBaazaarERC1155Purchases(address);
-  // const formattedPurchasedErc1155 = formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, PURCHASE);
-  // const soldERC1155Res = await fetchBaazaarERC1155Sales(address);
-  // const formattedSoldErc1155 = formatERC1155Purchases(soldERC1155Res.erc1155Purchases, SALE);
-  // return [...formattedBids, ...formattedPurchasedErc1155, ...formattedSoldErc1155];
+  const purchaseERC1155Res = await fetchBaazaarERC1155Purchases(address);
+  const soldERC1155Res = await fetchBaazaarERC1155Sales(address);
 
-  const erc721Purchases = await fetchERC721Purchases(address);
-  const formattedERC721Purchases = await getFormattedERC721s(erc721Purchases.erc721Listings, true);
+  const formattedBids = formatBids(bids);
+  const formattedPurchasedErc1155 = formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, true);
+  const formattedSoldErc1155 = formatERC1155Purchases(soldERC1155Res.erc1155Purchases, false);
 
-  console.log(formattedERC721Purchases);
+  return [...formattedBids, ...formattedPurchasedErc1155, ...formattedSoldErc1155];
 }
 
 const formatBids = (bids) => {
   return bids.map(bid => {
-    return {
-      date: timestampToDate(bid.bidTime),
-      sentAmount: Number(utils.formatEther(bid.amount)),
-      sentCurrency: "GHST",
-      receivedAmount: 1,
-      receivedCurrency: `GOTCHI ${bid.type.toUpperCase()} #${bid.tokenId}`,
-      feeAmount: 0,
-      feeCurrency: 'MATIC',
-      netWorthAmount: undefined,
-      netWorthCurrency: undefined,
-      label: 'swap',
-      description: undefined,
-      txHash: undefined
+    const sent = {
+      amount: priceInWeiToEthers(bid.amount),
+      currency: "GHST",
     }
+    const received = {
+      amount: 1,
+      currency: `GOTCHI ${bid.type.toUpperCase()} #${bid.tokenId}`
+    }
+    return mapToExcelFormat(bid.bidTime, sent, received);
   })
+}
+
+const mapToExcelFormat = (timeStamp, sent, received) => {
+  return {
+    date: timestampToDate(timeStamp),
+    sentAmount: sent.amount,
+    sentCurrency: sent.currency,
+    receivedAmount: received.amount,
+    receivedCurrency: received.currency,
+    feeAmount: 0,
+    feeCurrency: 'MATIC',
+    netWorthAmount: undefined,
+    netWorthCurrency: undefined,
+    label: 'swap',
+    description: undefined,
+    txHash: undefined
+  }
 }
 
 const formatERC1155Purchases = (purchases, isPurchase) => {
   return purchases.map(purchase => {
     const nftId = `GOTCHI ERC1155 #${purchase.erc1155TypeId}`;
     const nftQuantity = Number(purchase.quantity);
-    const tokenCost = Number(purchase.priceInWei / Math.pow(10, 18)) * nftQuantity;
+    const tokenCost = priceInWeiToEthers(purchase.priceInWei) * nftQuantity;
 
-    return {
-      date: timestampToDate(purchase.timeLastPurchased),
-      sentAmount: isPurchase ? tokenCost : nftQuantity,
-      sentCurrency: isPurchase ? "GHST" : nftId,
-      receivedAmount: isPurchase ? nftQuantity : tokenCost,
-      receivedCurrency: isPurchase ? nftId : "GHST",
-      feeAmount: 0,
-      feeCurrency: 'MATIC',
-      netWorthAmount: undefined,
-      netWorthCurrency: undefined,
-      label: 'swap',
-      description: undefined,
-      txHash: undefined
+    const sent = {
+      amount: isPurchase ? tokenCost : nftQuantity,
+      currency: isPurchase ? "GHST" : nftId,
     }
+    const received = {
+      amount: isPurchase ? nftQuantity : tokenCost,
+      currency: isPurchase ? nftId : "GHST"
+    }
+
+    return mapToExcelFormat(purchase.timeLastPurchased, sent, received)
   })
+}
+
+const getERC721Transactions = async (address) => {
+  const erc721Purchases = await fetchERC721Purchases(address);
+  const formattedERC721Purchases = await getFormattedERC721s(erc721Purchases.erc721Listings, true);
+
+  const erc721Sales = await fetchERC721Sales(address);
+  const formattedERC721Sales = await getFormattedERC721s(erc721Sales.erc721Listings, false);
+  return [...formattedERC721Purchases, ...formattedERC721Sales];
 }
 
 const getFormattedERC721s = async (erc721s, isPurchase) => {
@@ -148,21 +163,17 @@ const formatERC721Listings = (listings, isPurchase, type) => {
   return listings.map(listing => {
     const nftId = `${type} ERC721 #${listing.tokenId}`;
     const nftQuantity = 1;
-    const tokenCost = Number(listing.priceInWei / Math.pow(10, 18)) * nftQuantity;
+    const tokenCost = priceInWeiToEthers(listing.priceInWei) * nftQuantity;
 
-    return {
-      date: timestampToDate(listing.timePurchased),
-      sentAmount: isPurchase ? tokenCost : nftQuantity,
-      sentCurrency: isPurchase ? "GHST" : nftId,
-      receivedAmount: isPurchase ? nftQuantity : tokenCost,
-      receivedCurrency: isPurchase ? nftId : "GHST",
-      feeAmount: 0,
-      feeCurrency: 'MATIC',
-      netWorthAmount: undefined,
-      netWorthCurrency: undefined,
-      label: 'swap',
-      description: undefined,
-      txHash: undefined
+    const sent = {
+      amount: isPurchase ? tokenCost : nftQuantity,
+      currency: isPurchase ? "GHST" : nftId,
     }
+    const received = {
+      amount: isPurchase ? nftQuantity : tokenCost,
+      currency: isPurchase ? nftId : "GHST"
+    }
+
+    return mapToExcelFormat(listing.timePurchased, sent, received)
   })
 }
