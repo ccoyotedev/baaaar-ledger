@@ -2,21 +2,25 @@ import graphql from 'graphql-request';
 
 export const coreURI = "https://api.thegraph.com/subgraphs/name/aavegotchi/aavegotchi-core-matic";
 export const gbmURI = "https://api.thegraph.com/subgraphs/name/aavegotchi/aavegotchi-gbm-wearables";
+export const gbmRealmURI = "https://api.thegraph.com/subgraphs/name/aavegotchi/aavegotchi-realm-matic";
 
 export const fetchGBMPurchases = async (address) => {
   const winQuery = gbmWins(address);
   return await callSubgraph(winQuery, gbmURI);
 }
 
+export const fetchGBMRealmPurchases = async (address) => {
+  const winQuery = gbmWins(address);
+  return await callSubgraph(winQuery, gbmRealmURI);
+}
+
 const gbmWins = (address) => {
   return `{
-      bids(first: 500, where:{bidder:"${address.toLowerCase()}", claimed: true, outbid: false}, orderBy: bidTime, orderDirection: desc) {
-        id
-        auctionID
+      bids(first: 500, where:{bidder:"${address.toLowerCase()}", outbid: false}, orderBy: bidTime, orderDirection: desc) {
         amount
         tokenId
-        type
         bidTime
+        type
       }
     }`;
 };

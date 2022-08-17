@@ -8,7 +8,8 @@ import {
   fetchBaazaarERC1155Sales,
   fetchERC721Purchases,
   fetchWeeklyERC1155Sales,
-  fetchERC721Sales
+  fetchERC721Sales,
+  fetchGBMRealmPurchases
 } from './subgraph.js';
 import {
   getERC1155ListingEvent,
@@ -16,27 +17,24 @@ import {
 } from './contract.js';
 
 export const fetchTransactions = async (address) => {
+  const realmTransactions = await getGBMTransactions(address);
   const erc1155Transactions = await getERC1155Transactions(address);
   const erc721Transactions = await getERC721Transactions(address);
 
-  return [...erc1155Transactions, ...erc721Transactions];
+  return [...realmTransactions, ...erc1155Transactions, ...erc721Transactions];
 }
 
-const getERC1155Transactions = async (address) => {
-  const {
-    bids
-  } = await fetchGBMPurchases(address);
-  const purchaseERC1155Res = await fetchBaazaarERC1155Purchases(address);
-  const soldERC1155Res = await fetchBaazaarERC1155Sales(address);
+const getGBMTransactions = async (address) => {
+  const realmBids = await fetchGBMRealmPurchases(address);
+  const wearableBids = await fetchGBMPurchases(address);
 
-  const formattedBids = formatBids(bids);
-  const formattedPurchasedErc1155 = await formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, true);
-  const formattedSoldErc1155 = await formatERC1155Purchases(soldERC1155Res.erc1155Purchases, false);
+  const formattedRealmBids = formatBids(realmBids.bids, 'REALM');
+  const formattedWearableBids = formatBids(wearableBids.bids, 'GOTCHI');
 
-  return [...formattedBids, ...formattedPurchasedErc1155, ...formattedSoldErc1155];
+  return [...formattedRealmBids, ...formattedWearableBids];
 }
 
-const formatBids = (bids) => {
+const formatBids = (bids, type) => {
   return bids.map(bid => {
     const sent = {
       amount: priceInWeiToEthers(bid.amount),
@@ -44,10 +42,20 @@ const formatBids = (bids) => {
     }
     const received = {
       amount: 1,
-      currency: `GOTCHI ${bid.type.toUpperCase()} #${bid.tokenId}`
+      currency: `${type} ${bid.type.toUpperCase()} #${bid.tokenId}`
     }
     return mapToExcelFormat(bid.bidTime, sent, received);
   })
+}
+
+const getERC1155Transactions = async (address) => {
+  const purchaseERC1155Res = await fetchBaazaarERC1155Purchases(address);
+  const soldERC1155Res = await fetchBaazaarERC1155Sales(address);
+
+  const formattedPurchasedErc1155 = await formatERC1155Purchases(purchaseERC1155Res.erc1155Purchases, true);
+  const formattedSoldErc1155 = await formatERC1155Purchases(soldERC1155Res.erc1155Purchases, false);
+
+  return [...formattedPurchasedErc1155, ...formattedSoldErc1155];
 }
 
 const mapToExcelFormat = (timeStamp, sent, received, txHash) => {

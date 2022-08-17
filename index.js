@@ -41,8 +41,8 @@ import exportToExcel from "./modules/exportToExcel.js";
 const ADDRESS = '0x7121cbda61e025eb6639cd797f63aad30f270680';
 
 const init = async () => {
-  // TODO - Realm won in GBM auction
   // TODO - Deduct sell fee from sales
+  // TODO - Format column header name
 
   const transactions = await fetchTransactions(ADDRESS);
   const sortedTransactions = transactions.sort((a, b) => a.date - b.date < 0 ? 1 : -1)
