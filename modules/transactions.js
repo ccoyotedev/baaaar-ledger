@@ -11,7 +11,8 @@ import {
   fetchERC721Sales
 } from './subgraph.js';
 import {
-  getERC1155ListingEvent
+  getERC1155ListingEvent,
+  getERC721ListingEvent
 } from './contract.js';
 
 export const fetchTransactions = async (address) => {
@@ -66,13 +67,13 @@ const mapToExcelFormat = (timeStamp, sent, received, txHash) => {
   }
 }
 
-const formatERC1155Purchases = async (purchases, isPurchase) => {
+const formatERC1155Purchases = async (purchases, isPurchase, noEvent) => {
   return await Promise.all(purchases.map(async purchase => {
     const nftId = `GOTCHI ERC1155 #${purchase.erc1155TypeId}`;
     const nftQuantity = Number(purchase.quantity);
     const tokenCost = priceInWeiToEthers(purchase.priceInWei) * nftQuantity;
 
-    const event = await getERC1155ListingEvent(purchase.listingID, purchase.timeLastPurchased);
+    const event = noEvent ? undefined : await getERC1155ListingEvent(purchase.listingID, purchase.timeLastPurchased);
     const txHash = event ? event.transactionHash : undefined;
 
     const sent = {
@@ -104,10 +105,10 @@ const getFormattedERC721s = async (erc721s, isPurchase) => {
     realmParcels
   } = mapERC721Types(erc721s);
   const splitPurchases = await splitERC1155FromERC721s(gotchis);
-  const equippedERC1155s = await formatERC1155Purchases(splitPurchases.erc1155s, isPurchase);
-  const formattedGotchis = formatERC721Listings(splitPurchases.gotchis, isPurchase, 'GOTCHI');
-  const formattedPortals = formatERC721Listings(portals, isPurchase, 'GOTCHI');
-  const formattedRealm = formatERC721Listings(realmParcels, isPurchase, 'REALM');
+  const equippedERC1155s = await formatERC1155Purchases(splitPurchases.erc1155s, isPurchase, true);
+  const formattedGotchis = await formatERC721Listings(splitPurchases.gotchis, isPurchase, 'GOTCHI');
+  const formattedPortals = await formatERC721Listings(portals, isPurchase, 'GOTCHI');
+  const formattedRealm = await formatERC721Listings(realmParcels, isPurchase, 'REALM');
   return [...equippedERC1155s, ...formattedGotchis, ...formattedPortals, ...formattedRealm];
 }
 
@@ -165,11 +166,14 @@ const fetchGoingRateForERC1155 = async (tokenId, timePurchased) => {
   return average.toString();
 }
 
-const formatERC721Listings = (listings, isPurchase, type) => {
-  return listings.map(listing => {
+const formatERC721Listings = async (listings, isPurchase, type) => {
+  return Promise.all(listings.map(async listing => {
     const nftId = `${type} ERC721 #${listing.tokenId}`;
     const nftQuantity = 1;
     const tokenCost = priceInWeiToEthers(listing.priceInWei) * nftQuantity;
+
+    const event = await getERC721ListingEvent(listing.id, listing.timePurchased);
+    const txHash = event ? event.transactionHash : undefined;
 
     const sent = {
       amount: isPurchase ? tokenCost : nftQuantity,
@@ -180,6 +184,6 @@ const formatERC721Listings = (listings, isPurchase, type) => {
       currency: isPurchase ? nftId : "GHST"
     }
 
-    return mapToExcelFormat(listing.timePurchased, sent, received)
-  })
+    return mapToExcelFormat(listing.timePurchased, sent, received, txHash)
+  }))
 }

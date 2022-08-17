@@ -67,6 +67,7 @@ const erc721Listings = (address, isBuyer) => {
   const role = isBuyer ? 'buyer' : 'seller';
   return `{
     erc721Listings(where: {timePurchased_gt: 0, ${role}: "${address}"}) {
+      id
       tokenId
       priceInWei
       timePurchased

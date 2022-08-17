@@ -12,13 +12,21 @@ const addresses = {
 }
 
 export const provider = new ethers.providers.JsonRpcProvider(process.env.JSON_RPC_PROVIDER)
+const contract = new ethers.Contract(addresses.diamond, diamondAbi, provider);
 
 export const getERC1155ListingEvent = async (listingId, timestamp) => {
+  return await getEvent('ERC1155ExecutedListing', listingId, timestamp);
+}
+
+export const getERC721ListingEvent = async (listingId, timestamp) => {
+  return await getEvent('ERC721ExecutedListing', listingId, timestamp);
+}
+
+const getEvent = async (eventName, listingId, timestamp) => {
   const range = findBlockRange(timestamp);
   if (!range) return;
 
-  const contract = new ethers.Contract(addresses.diamond, diamondAbi, provider);
-  const receivedFilter = contract.filters.ERC1155ExecutedListing(listingId);
+  const receivedFilter = contract.filters[eventName](listingId);
   const events = await contract.queryFilter(receivedFilter, range.min, range.max);
   return events[0];
 }
@@ -26,7 +34,6 @@ export const getERC1155ListingEvent = async (listingId, timestamp) => {
 export const useDiamondCall = async (
   method
 ) => {
-  const contract = new ethers.Contract(addresses.diamond, diamondAbi, provider);
   try {
     const {
       name,
