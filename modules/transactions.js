@@ -16,6 +16,10 @@ import {
   getERC721ListingEvent
 } from './contract.js';
 
+const BAAZAAR_FEE_INCREASE_TIMESTAMP = 1622419200;
+const FEE_PRE_INCREASE = 0.03;
+const FEE_POST_INCREASE = 0.035
+
 export const fetchTransactions = async (address) => {
   const realmTransactions = await getGBMTransactions(address);
   const erc1155Transactions = await getERC1155Transactions(address);
@@ -80,21 +84,27 @@ const formatERC1155Purchases = async (purchases, isPurchase, noEvent) => {
     const nftId = `GOTCHI ERC1155 #${purchase.erc1155TypeId}`;
     const nftQuantity = Number(purchase.quantity);
     const tokenCost = priceInWeiToEthers(purchase.priceInWei) * nftQuantity;
+    const salePrice = isPurchase ? tokenCost : getAmountAfterSaleFee(purchase.timeLastPurchased, tokenCost)
 
     const event = noEvent ? undefined : await getERC1155ListingEvent(purchase.listingID, purchase.timeLastPurchased);
     const txHash = event ? event.transactionHash : undefined;
 
     const sent = {
-      amount: isPurchase ? tokenCost : nftQuantity,
+      amount: isPurchase ? salePrice : nftQuantity,
       currency: isPurchase ? "GHST" : nftId,
     }
     const received = {
-      amount: isPurchase ? nftQuantity : tokenCost,
+      amount: isPurchase ? nftQuantity : salePrice,
       currency: isPurchase ? nftId : "GHST"
     }
 
     return mapToExcelFormat(purchase.timeLastPurchased, sent, received, txHash)
   }))
+}
+
+const getAmountAfterSaleFee = (timestamp, price) => {
+  const percent = timestamp < BAAZAAR_FEE_INCREASE_TIMESTAMP ? 1 - FEE_PRE_INCREASE : 1 - FEE_POST_INCREASE;
+  return price * percent;
 }
 
 const getERC721Transactions = async (address) => {
@@ -179,16 +189,17 @@ const formatERC721Listings = async (listings, isPurchase, type) => {
     const nftId = `${type} ERC721 #${listing.tokenId}`;
     const nftQuantity = 1;
     const tokenCost = priceInWeiToEthers(listing.priceInWei) * nftQuantity;
+    const salePrice = isPurchase ? tokenCost : getAmountAfterSaleFee(listing.timePurchased, tokenCost)
 
     const event = await getERC721ListingEvent(listing.id, listing.timePurchased);
     const txHash = event ? event.transactionHash : undefined;
 
     const sent = {
-      amount: isPurchase ? tokenCost : nftQuantity,
+      amount: isPurchase ? salePrice : nftQuantity,
       currency: isPurchase ? "GHST" : nftId,
     }
     const received = {
-      amount: isPurchase ? nftQuantity : tokenCost,
+      amount: isPurchase ? nftQuantity : salePrice,
       currency: isPurchase ? nftId : "GHST"
     }
 
